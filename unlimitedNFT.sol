@@ -1,45 +1,63 @@
 //SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.9;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import "@openzeppelin/contracts/token/common/ERC2981.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import '@openzeppelin/contracts/access/Ownable.sol';
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "erc721a/contracts/ERC721A.sol";
+import "erc721a/contracts/extensions/ERC721ABurnable.sol";
+import "erc721a/contracts/extensions/ERC721AQueryable.sol";
 
-contract UnlimitedNFT is ERC721, ERC721Enumerable, ERC2981, Ownable {
+contract DNCT2 is Ownable, ERC721A, ERC721ABurnable, ERC721AQueryable {
+
     string public _tokenUri = ""; // Initial base URI
+    uint256 public _currentMaxSupply = 500;
+    uint256 public _currentPriceWei = 10000000000000000000; // 10USD
 
-    constructor() ERC721("UnlimitedNFT", "UnlimitedNFT") {}
+    struct TokenInfo {
+        IERC20 paytoken;
+    }
+
+    TokenInfo[] public AllowedCrypto;
+
+    constructor() ERC721A("UnlimitedNFT", "UnlimitedNFT") {}
+
+    function addCurrency(IERC20 _paytoken) public onlyOwner {
+        AllowedCrypto.push(
+            TokenInfo({
+                paytoken: _paytoken,
+            })
+        );
+    }
 
     function changeBaseUri(string memory _newUri) public onlyOwner {
         _tokenUri = _newUri;
     }
 
-    function mintMany(address _to, uint256 _n) public onlyOwner {
-        uint256 ts = totalSupply();
-        for (uint256 i = 1; i <= _n; i++) {
-            _mint(_to, ts + i);
-        }
+    function increaseMaxSupplyAndPrice(uint256 _newMaxSupply, uint256 _newPriceWei) public onlyOwner {
+        _currentMaxSupply = _newMaxSupply;
+        _currentPriceWei = _newPriceWei;
     }
 
-    function setDefaultRoyalty(address _receiver, uint96 _feeNumerator) public onlyOwner {
-        _setDefaultRoyalty(_receiver, _feeNumerator);
+    function publicMint(address _to, uint256 _quantity, uint256 _pid) external payable {
+        TokenInfo storage tokens = AllowedCrypto[_pid];
+        IERC20 paytoken;
+        paytoken = tokens.paytoken;
+
+        require(totalSupply() + _quantity <= _currentMaxSupply, "Cannot exceed current total supply");
+        require(msg.value == _quantity * _currentPriceWei, "Not enough balance to complete transaction.");
+
+        paytoken.transferFrom(msg.sender, address(this), _quantity * _currentPriceWei);
+        _mint(_to, _quantity);
     }
 
-    function burn(uint256 tokenId) public onlyOwner {
-        _burn(tokenId);
+    function withdraw(address payable _to, uint256 _pid) public payable onlyOwner() {
+        TokenInfo storage tokens = AllowedCrypto[_pid];
+        IERC20 paytoken;
+        paytoken = tokens.paytoken;
+        paytoken.transfer(_to, paytoken.balanceOf(address(this)));
     }
 
-    /** OVERRIDES */
-    function _baseURI() internal view override returns (string memory) {
-        return _tokenUri;
-    }
-    
-    function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal override(ERC721, ERC721Enumerable) {
-        super._beforeTokenTransfer(from, to, tokenId);
-    }
-    
-    function supportsInterface(bytes4 interfaceId) public view override(ERC721, ERC721Enumerable, ERC2981) returns (bool) {
-        return super.supportsInterface(interfaceId);
+    function withdrawMoneyTo(address payable _to) public onlyOwner {
+        _to.transfer(address(this).balance);
     }
 }
