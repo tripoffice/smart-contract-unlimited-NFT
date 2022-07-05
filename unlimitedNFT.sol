@@ -63,7 +63,8 @@ contract DNC3 is Ownable, ERC721A, ERC721ABurnable, ERC721AQueryable {
     }
 
     function withdrawUSD(address payable to, uint256 pid) external payable onlyOwner() {
-        stablecoins[pid].transfer(to, paytoken.balanceOf(address(this)));
+        IERC20 paytoken = stablecoins[pid];
+        paytoken.transfer(to, paytoken.balanceOf(address(this)));
     }
 
     function withdrawETH(address payable to) external onlyOwner {
