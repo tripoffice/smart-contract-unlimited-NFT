@@ -1,29 +1,28 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.9;
-
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "erc721a/contracts/ERC721A.sol";
-import "erc721a/contracts/extensions/ERC721ABurnable.sol";
-import "erc721a/contracts/extensions/ERC721AQueryable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract DNC3 is Ownable, ERC721A, ERC721ABurnable, ERC721AQueryable {
+contract DNCPOL is ERC721Enumerable, ERC721URIStorage, Ownable {
 
     string public tokenUri = "https://nft.trvcdn.com/dnc/"; // Initial base URI
+
+    uint256 public counter = 0;
     uint256 public currentMaxSupply = 500;
     uint256 public currentPriceWei = 10000000000000000000; // 10USD
 
     IERC20[16] public stablecoins = [
-        IERC20(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48), // USDC Ethereum
         IERC20(0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174), // USDC Polygon
-        IERC20(0xdAC17F958D2ee523a2206206994597C13D831ec7), // USDT Ethereum
-        IERC20(0xc2132D05D31c914a87C6611C10748AEb04B58e8F)  // USDT Polygon
+        IERC20(0xc2132D05D31c914a87C6611C10748AEb04B58e8F),  // USDT Polygon
     ];
 
     bool public activeMintUSD = true;
     bool public activeMintETH = false;
 
-    constructor() ERC721A("Digital Nomads Club", "DNC") {}
+    constructor() ERC721("Digital Nomads Club", "DNC") {}
 
     function setActiveMintUSD(bool active) external onlyOwner {
         activeMintUSD = active;
@@ -50,16 +49,28 @@ contract DNC3 is Ownable, ERC721A, ERC721ABurnable, ERC721AQueryable {
         currentPriceWei = newPriceWei;
     }
 
+    function fixCounter(uint256 c) external onlyOwner {
+        counter = c;
+    }
+
     function publicMintUSD(address to, uint256 quantity, uint256 pid) external payable {
         uint256 totalPrice = quantity * currentPriceWei;
-        require(activeMintUSD && totalSupply() + quantity <= currentMaxSupply && msg.value == totalPrice);
+        require(activeMintUSD && counter + quantity <= currentMaxSupply && msg.value == totalPrice);
         stablecoins[pid].transferFrom(msg.sender, address(this), totalPrice);
-        _mint(to, quantity);
+        uint256 tmpCounter = counter;
+        counter += quantity;
+        for(uint256 i = 1; i <= quantity; i++) {
+            _mint(to, tmpCounter + i);
+        }        
     }
 
     function publicMintETH(address to, uint256 quantity) external payable {
-        require(activeMintETH && totalSupply() + quantity <= currentMaxSupply && msg.value == quantity * currentPriceWei);
-        _mint(to, quantity);
+        require(activeMintETH && counter + quantity <= currentMaxSupply && msg.value == quantity * currentPriceWei);
+        uint256 tmpCounter = counter;
+        counter += quantity;
+        for(uint256 i = 1; i <= quantity; i++) {
+            _mint(to, tmpCounter + i);
+        }
     }
 
     function withdrawUSD(address payable to, uint256 pid) external payable onlyOwner() {
@@ -69,5 +80,23 @@ contract DNC3 is Ownable, ERC721A, ERC721ABurnable, ERC721AQueryable {
 
     function withdrawETH(address payable to) external onlyOwner {
         to.transfer(address(this).balance);
+    }
+
+    // The following functions are overrides required by Solidity.
+
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId) internal override(ERC721, ERC721Enumerable) {
+        super._beforeTokenTransfer(from, to, tokenId);
+    }
+
+    function _burn(uint256 tokenId) internal override(ERC721, ERC721URIStorage) {
+        super._burn(tokenId);
+    }
+
+    function tokenURI(uint256 tokenId) public view override(ERC721, ERC721URIStorage) returns (string memory) {
+        return super.tokenURI(tokenId);
+    }
+
+    function supportsInterface(bytes4 interfaceId) public view override(ERC721, ERC721Enumerable) returns (bool) {
+        return super.supportsInterface(interfaceId);
     }
 }
