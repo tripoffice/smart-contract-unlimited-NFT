@@ -16,17 +16,21 @@ contract DNCT is ERC721Enumerable, Ownable {
 
     IERC20 public stablecoin = IERC20(0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174); // USDC Polygon
 
-    bool public activeMatic = false;
-    bool public activeUSD = false;
+    bool public isActiveMatic = false;
+    bool public isActiveUSD = false;
+
+    event currentPriceUSD(uint256 indexed _newPriceUSD);
+    event currentPriceMatic(uint256 indexed _newPriceMatic);
+    event currentMaxSupply(uint256 indexed _newMaxSupply);
 
     constructor() ERC721("Digital Nomads Club", "DNC") {}
 
     function setActiveMatic(bool active) external onlyOwner {
-        activeMatic = active;
+        isActiveMatic = active;
     }
 
     function setActiveUSD(bool active) external onlyOwner {
-        activeUSD = active;
+        isActiveUSD = active;
     }
 
     function changeStablecoin(IERC20 newStablecoin) external onlyOwner {
@@ -39,14 +43,17 @@ contract DNCT is ERC721Enumerable, Ownable {
 
     function changePriceMatic(uint256 newPriceMatic) external onlyOwner {
         priceMatic = newPriceMatic;
+        emit currentPriceMatic(newPriceMatic);
     }
 
     function changePriceUSD(uint256 newPriceUSD) external onlyOwner {
         priceUSD = newPriceUSD;
+        emit currentPriceUSD(newPriceUSD);
     }
 
     function changeMaxSupply(uint256 newMaxSupply) external onlyOwner {
         maxSupply = newMaxSupply;
+        emit currentMaxSupply(newMaxSupply);
     }
 
     function fixCounter(uint256 c) external onlyOwner {
@@ -63,7 +70,7 @@ contract DNCT is ERC721Enumerable, Ownable {
 
     function publicMintUSD(address to, uint256 quantity) external {
         uint256 totalPrice = quantity * priceUSD;
-        require(activeUSD, "Public sale not active (USD)!");
+        require(isActiveUSD, "Public sale not active (USD)!");
         require(counter + quantity <= maxSupply, "Cannot mint more than current max supply!");
         require(stablecoin.transferFrom(msg.sender, address(this), totalPrice), "Cannot send stablecoins!");
         uint256 tmpCounter = counter;
@@ -74,7 +81,7 @@ contract DNCT is ERC721Enumerable, Ownable {
     }
 
     function publicMintMatic(address to, uint256 quantity) external payable {
-        require(activeMatic, "Public sale not active (matic)!");
+        require(isActiveMatic, "Public sale not active (matic)!");
         require(counter + quantity <= maxSupply, "Cannot mint more than current max supply!");
         require(msg.value == quantity * priceMatic, "Incorrect amount sent!");
         uint256 tmpCounter = counter;
